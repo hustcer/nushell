@@ -71,7 +71,7 @@ const FULL_RLS_NAMING = {
 
 # $env
 
-let USE_UBUNTU = $os starts-with ubuntu
+let USE_UBUNTU = $os =~ ubuntu
 let FULL_NAME = $FULL_RLS_NAMING | get -i $target | default 'unknown-target-full'
 
 print $'(char nl)Packaging ($bin) v($version) for ($target) in ($src)...'; hr-line -b
