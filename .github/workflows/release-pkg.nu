@@ -135,7 +135,7 @@ cd $src; mkdir $dist;
 rm -rf $'target/($target)/release/*.d' $'target/($target)/release/nu_pretty_hex*'
 print $'(char nl)All executable files:'; hr-line
 # We have to use `print` here to make sure the command output is displayed
-print (ls -f $executable); sleep 1sec
+# print (ls -f $executable); sleep 1sec
 
 print $'(char nl)Copying release files...'; hr-line
 "To use Nu plugins, use the register command to tell Nu where to find the plugin. For example:
