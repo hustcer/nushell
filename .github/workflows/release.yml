@@ -113,7 +113,6 @@ jobs:
       if: ${{ startsWith(github.ref, 'refs/tags/') }}
       with:
         draft: true
-        name: ${{ github.ref_name }}
         tag_name: ${{ github.ref_name }}
         files: ${{ steps.nu.outputs.archive }}
       env:
@@ -139,7 +138,6 @@ jobs:
       with:
         draft: true
         files: SHA256SUMS
-        name: ${{ github.ref_name }}
         tag_name: ${{ github.ref_name }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
