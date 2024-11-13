@@ -14,9 +14,22 @@ defaults:
     shell: bash
 
 jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare Release
+        uses: softprops/action-gh-release@v2.1.0
+        continue-on-error: true
+        with:
+          draft: true
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release:
     name: Nu
-
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
@@ -97,15 +110,6 @@ jobs:
         REF: ${{ github.ref }}
         TARGET: ${{ matrix.target }}
         _EXTRA_: ${{ matrix.extra }}
-
-    - name: Prepare Release
-      uses: softprops/action-gh-release@v2.1.0
-      continue-on-error: true
-      with:
-        draft: true
-        tag_name: ${{ github.ref_name }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # REF: https://github.com/marketplace/actions/gh-release
     - name: Publish Archive
