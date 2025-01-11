@@ -9,7 +9,7 @@ on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-[a-zA-Z]+[0-9]*' # Allow tags with -beta1, -rc, etc.
+      - '[0-9]+.[0-9]+.[0-9]+-[beta|rc][0-9]*' # Allow tags with -beta1, -rc, etc.
 
 defaults:
   run:
