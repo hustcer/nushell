@@ -50,3 +50,8 @@ tarpaulin-report.html
 
 # pre-commit-hooks
 .pre-commit-config.yaml
+
+wix/README.txt
+wix/bin/
+wix/nu/
+wix/obj/
