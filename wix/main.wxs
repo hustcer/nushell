@@ -41,6 +41,19 @@
     <!-- If set to WixPerMachineFolder will install for PerMachine by default -->
     <Property Id="WixAppFolder" Value="WixLocalAppDataFolder" />
 
+    <!-- Search for previous installation path in registry -->
+    <Property Id="REMEMBERED_APPLICATIONFOLDER">
+      <RegistrySearch Id="RememberPropertyMachine" Root="HKLM"
+                      Key="Software\nu"
+                      Name="InstallPath" Type="raw" />
+    </Property>
+
+    <Property Id="REMEMBERED_INSTALLDIR_USER">
+      <RegistrySearch Id="RememberPropertyUser" Root="HKCU"
+                      Key="Software\nu"
+                      Name="InstallPath" Type="raw" />
+    </Property>
+
     <!--
       Support for winget install `——scope machine`:
         Winget doesn't directly pass ALLUSERS=1 to the MSI installer when using
@@ -57,7 +70,7 @@
     <CustomAction Id="Overwrite_WixSetDefaultPerMachineFolder" Property="WixPerMachineFolder"
       Value="[ProgramFiles64Folder][ApplicationFolderName]" Execute="immediate" />
     <CustomAction Id="Overwrite_ARPINSTALLLOCATION" Property="ARPINSTALLLOCATION"
-      Value="[ProgramFiles64Folder][ApplicationFolderName]" Execute="immediate" />
+      Value="[APPLICATIONFOLDER]" Execute="immediate" />
     <InstallUISequence>
       <Custom Action="Overwrite_WixSetDefaultPerMachineFolder" After="WixSetDefaultPerMachineFolder" />
     </InstallUISequence>
@@ -100,6 +113,12 @@
                            Type="integer"
                            Value="1"
                            KeyPath="yes" />
+            <!-- Save installation path for upgrades -->
+            <RegistryValue Root="HKLM"
+                           Key="Software\nu"
+                           Name="InstallPath"
+                           Type="string"
+                           Value="[APPLICATIONFOLDER]" />
           </Component>
         </Directory>
       </Directory>
@@ -125,6 +144,12 @@
                              Type="integer"
                              Value="1"
                              KeyPath="yes" />
+              <!-- Save installation path for upgrades -->
+              <RegistryValue Root="HKCU"
+                             Key="Software\nu"
+                             Name="InstallPath"
+                             Type="string"
+                             Value="[INSTALLDIR_USER]" />
             </Component>
           </Directory>
         </Directory>
@@ -231,17 +256,39 @@
       <Launch Condition="ProcessorArchitecture = 'ARM64'" Message="This installation package is only supported on ARM64 Windows." />
     <?endif?>
 
+    <!-- Set installation paths from remembered values if they exist -->
+    <SetProperty Id="APPLICATIONFOLDER"
+                 Action="SetAPPLICATIONFOLDER_Remembered"
+                 Value="[REMEMBERED_APPLICATIONFOLDER]"
+                 After="AppSearch"
+                 Condition="REMEMBERED_APPLICATIONFOLDER AND ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1"
+                 Sequence="both" />
+
+    <SetProperty Id="INSTALLDIR_USER"
+                 Action="SetINSTALLDIR_USER_Remembered"
+                 Value="[REMEMBERED_INSTALLDIR_USER]"
+                 After="AppSearch"
+                 Condition="REMEMBERED_INSTALLDIR_USER AND MSIINSTALLPERUSER=1"
+                 Sequence="both" />
+
     <!-- If installing per-user (MSIINSTALLPERUSER=1), this sets INSTALLDIR and BINDIR to point to user-specific paths -->
     <SetProperty Id="INSTALLDIR"
                  Action="SetINSTALLDIR_User"
                  Value="[LocalAppDataFolder]Programs\$(var.ApplicationFolderName)"
                  After="LaunchConditions"
-                 Condition="MSIINSTALLPERUSER=1"
+                 Condition="MSIINSTALLPERUSER=1 AND NOT REMEMBERED_INSTALLDIR_USER"
+                 Sequence="both" />
+
+    <SetProperty Id="INSTALLDIR"
+                 Action="SetINSTALLDIR_User_Remembered"
+                 Value="[INSTALLDIR_USER]"
+                 After="SetINSTALLDIR_USER_Remembered"
+                 Condition="MSIINSTALLPERUSER=1 AND REMEMBERED_INSTALLDIR_USER"
                  Sequence="both" />
     <SetProperty Id="BINDIR"
                  Action="SetBINDIR_User"
-                 Value="[LocalAppDataFolder]Programs\$(var.ApplicationFolderName)\bin"
-                 After="LaunchConditions"
+                 Value="[INSTALLDIR]\bin"
+                 After="SetINSTALLDIR_User_Remembered"
                  Condition="MSIINSTALLPERUSER=1"
                  Sequence="both" />
 
@@ -249,23 +296,23 @@
     <SetProperty Id="INSTALLDIR"
                  Action="SetINSTALLDIR_Machine"
                  Value="[APPLICATIONFOLDER]"
-                 After="LaunchConditions"
+                 After="SetAPPLICATIONFOLDER_Remembered"
                  Condition="ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1"
                  Sequence="both" />
 
-    <!-- Override APPLICATIONFOLDER for 64-bit installations -->
+    <!-- Override APPLICATIONFOLDER for 64-bit installations (only if not remembered) -->
     <?if $(sys.BUILDARCH) = x64 OR $(sys.BUILDARCH) = arm64 ?>
     <SetProperty Id="APPLICATIONFOLDER"
                  Value="[ProgramFiles64Folder]$(var.ApplicationFolderName)"
                  After="LaunchConditions"
-                 Condition="ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1"
+                 Condition="ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1 AND NOT REMEMBERED_APPLICATIONFOLDER"
                  Sequence="both" />
     <?endif?>
 
     <SetProperty Id="BINDIR"
                  Action="SetBINDIR_Machine"
-                 Value="[BINDIR]"
-                 After="LaunchConditions"
+                 Value="[APPLICATIONFOLDER]\bin"
+                 After="SetINSTALLDIR_Machine"
                  Condition="ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1"
                  Sequence="both" />
 
