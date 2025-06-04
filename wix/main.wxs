@@ -158,10 +158,17 @@
 
     <ComponentGroup Id="NushellBinaries" Directory="LOGICAL_BINDIR">
       <Component Id="Nu_Main" Guid="*">
-        <File Id="nu.exe" Source="$(var.SourceDir)\nu.exe" KeyPath="yes" />
+        <File Id="nu.exe" Source="$(var.SourceDir)\nu.exe" KeyPath="yes">
+          <Permission User="Users" GenericExecute="yes" GenericRead="yes" />
+        </File>
+        <CreateFolder>
+          <Permission User="Users" GenericRead="yes" GenericExecute="yes" />
+        </CreateFolder>
       </Component>
       <Component Id="Less" Guid="*">
-        <File Id="less.exe" Source="$(var.SourceDir)\less.exe" KeyPath="yes" />
+        <File Id="less.exe" Source="$(var.SourceDir)\less.exe" KeyPath="yes">
+          <Permission User="Users" GenericExecute="yes" GenericRead="yes" />
+        </File>
       </Component>
       <Component Id="Nu_Plugin_Inc" Guid="*">
         <File Id="nu_plugin_inc.exe" Source="$(var.SourceDir)\nu_plugin_inc.exe" KeyPath="yes" />
@@ -272,13 +279,19 @@
     <!-- Set the LOGICAL_BINDIR property to the resolved BINDIR path -->
     <!-- This line MUST NOT be removed in order to set a custom folder for PerMachine installation -->
     <SetProperty Id="LOGICAL_BINDIR" Value="[BINDIR]" After="LaunchConditions" Sequence="both" />
-
     <!-- Property that defines the command executed by the Windows Terminal Profile custom action -->
     <!-- for Value, see https://learn.microsoft.com/en-ca/windows/win32/msi/formatted -->
+    <!-- Add path validation and escaping for security -->
+    <SetProperty Id="ValidateWindowsTerminalPaths"
+                 After="CostFinalize"
+                 Value='[#nu.exe]' />
+    <Condition Message="Invalid file path detected in Windows Terminal Profile configuration">
+        <![CDATA[NOT INSTALLED OR ValidateWindowsTerminalPaths]]>
+    </Condition>
     <SetProperty Id="ReplacePathsInWindowsTerminalProfile"
                  Sequence="execute"
-                 After="CostFinalize"
-                 Value="&quot;[#nu.exe]&quot; -c &quot;let doc = (open `[#WindowsTerminalProfileFile]` | update profiles.commandline `[#nu.exe]` | update profiles.icon `[#nu.ico]`); $doc | save -f `[#WindowsTerminalProfileFile]`&quot;"
+                 After="ValidateWindowsTerminalPaths"
+                 Value="&quot;[#nu.exe]&quot; -c &quot;do { let exe = '[#nu.exe]' | str replace '\\' '\\\\'; let icon = '[#nu.ico]' | str replace '\\' '\\\\'; let doc = (open '[#WindowsTerminalProfileFile]' | update profiles.commandline $exe | update profiles.icon $icon); $doc | save -f '[#WindowsTerminalProfileFile]' } | complete&quot;"
                  Condition="&amp;WindowsTerminalProfileFeature=3" />
 
     <!-- Defines the custom action that updates paths in the Windows Terminal profile JSON file -->
