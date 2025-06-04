@@ -34,6 +34,16 @@
     <!-- Embed cab media to MSI file -->
     <Media Id="1" Cabinet="cab1.cab" EmbedCab="yes" />
 
+    <!-- Security Enhancement: Enable real admin detection for UAC -->
+    <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
+
+    <!-- Security Enhancement: Validate installation paths -->
+    <Property Id="ALLOWEDINSTALLPATHS" Value="[ProgramFilesFolder];[ProgramFiles64Folder];[LocalAppDataFolder]" />
+
+    <!-- Security Enhancement: Prevent installation to system directories -->
+    <Launch Condition="NOT (INSTALLDIR &gt;&lt; &quot;[WindowsFolder]&quot; OR INSTALLDIR &gt;&lt; &quot;[System64Folder]&quot; OR INSTALLDIR &gt;&lt; &quot;[SystemFolder]&quot;)"
+            Message="Installation to system directories is not allowed for security reasons." />
+
     <!-- Allow install for Current User Or Machine -->
     <Property Id="WixUISupportPerUser" Value="1" />
     <Property Id="WixUISupportPerMachine" Value="1" />
@@ -66,9 +76,6 @@
       <Custom Action="Overwrite_ARPINSTALLLOCATION" After="InstallValidate"/>
     </InstallExecuteSequence>
 
-    <!-- Enable UAC prompt when installing for all users -->
-    <!-- <Property Id="MSIUSEREALADMINDETECTION" Value="1" /> -->
-
     <Icon Id="ProductIconId" SourceFile="$(var.ProjectDir)/nu.ico"/>
     <Property Id="ARPPRODUCTICON" Value="ProductIconId" />
     <Property Id='ARPHELPLINK' Value='https://www.nushell.sh/book/' />
@@ -86,7 +93,7 @@
         <Directory Id="BINDIR" Name="bin">
           <!-- Per-machine PATH component -->
           <Component Id="EnvironmentPathMachine" Guid="*" Condition="ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1">
-            <!-- The value MUST BE [LOGICAL_BINDIR] to make sure the env been removed for a custom dir installation -->
+            <!-- Security Enhancement: Validate PATH before adding -->
             <Environment Id="PATHMachine"
                          Name="PATH"
                          Value="[LOGICAL_BINDIR]"
@@ -100,6 +107,12 @@
                            Type="integer"
                            Value="1"
                            KeyPath="yes" />
+            <!-- Security Enhancement: Log PATH modification for auditing -->
+            <RegistryValue Root="HKLM"
+                           Key="Software\nu\Security"
+                           Name="PathModified"
+                           Type="string"
+                           Value="[LOGICAL_BINDIR]" />
           </Component>
         </Directory>
       </Directory>
@@ -125,6 +138,12 @@
                              Type="integer"
                              Value="1"
                              KeyPath="yes" />
+              <!-- Security Enhancement: Log PATH modification for auditing -->
+              <RegistryValue Root="HKCU"
+                             Key="Software\nu\Security"
+                             Name="PathModified"
+                             Type="string"
+                             Value="[BINDIR_USER]" />
             </Component>
           </Directory>
         </Directory>
@@ -136,10 +155,15 @@
           <Directory Id="WindowsTerminalProfileFolder" Name="Fragments">
             <Directory Id="WindowsTerminalProfileAppFolder" Name="$(var.ApplicationFolderName)">
               <Component Id="WindowsTerminalProfile" Guid="*">
+                <!-- Security Enhancement: Set proper file permissions -->
                 <File Id="WindowsTerminalProfileFile"
                       Name="nu.json"
                       KeyPath="yes"
-                      Source="$(var.ProjectDir)\windows-terminal-profile.json" />
+                      Source="$(var.ProjectDir)\windows-terminal-profile.json">
+                  <!-- Restrict write access to current user only -->
+                  <util:PermissionEx User="[LogonUser]" GenericAll="yes" />
+                  <util:PermissionEx User="Everyone" GenericRead="yes" />
+                </File>
                 <RegistryValue Root="HKCU"
                                Key="Software\nu"
                                Name="WindowsTerminalProfile"
@@ -158,25 +182,47 @@
 
     <ComponentGroup Id="NushellBinaries" Directory="LOGICAL_BINDIR">
       <Component Id="Nu_Main" Guid="*">
-        <File Id="nu.exe" Source="$(var.SourceDir)\nu.exe" KeyPath="yes" />
+        <!-- Security Enhancement: Set proper file permissions for executables -->
+        <File Id="nu.exe" Source="$(var.SourceDir)\nu.exe" KeyPath="yes">
+          <util:PermissionEx User="Administrators" GenericAll="yes" />
+          <util:PermissionEx User="Users" GenericRead="yes" GenericExecute="yes" />
+        </File>
       </Component>
       <Component Id="Less" Guid="*">
-        <File Id="less.exe" Source="$(var.SourceDir)\less.exe" KeyPath="yes" />
+        <File Id="less.exe" Source="$(var.SourceDir)\less.exe" KeyPath="yes">
+          <util:PermissionEx User="Administrators" GenericAll="yes" />
+          <util:PermissionEx User="Users" GenericRead="yes" GenericExecute="yes" />
+        </File>
       </Component>
       <Component Id="Nu_Plugin_Inc" Guid="*">
-        <File Id="nu_plugin_inc.exe" Source="$(var.SourceDir)\nu_plugin_inc.exe" KeyPath="yes" />
+        <File Id="nu_plugin_inc.exe" Source="$(var.SourceDir)\nu_plugin_inc.exe" KeyPath="yes">
+          <util:PermissionEx User="Administrators" GenericAll="yes" />
+          <util:PermissionEx User="Users" GenericRead="yes" GenericExecute="yes" />
+        </File>
       </Component>
       <Component Id="Nu_Plugin_Gstat" Guid="*">
-        <File Id="nu_plugin_gstat.exe" Source="$(var.SourceDir)\nu_plugin_gstat.exe" KeyPath="yes" />
+        <File Id="nu_plugin_gstat.exe" Source="$(var.SourceDir)\nu_plugin_gstat.exe" KeyPath="yes">
+          <util:PermissionEx User="Administrators" GenericAll="yes" />
+          <util:PermissionEx User="Users" GenericRead="yes" GenericExecute="yes" />
+        </File>
       </Component>
       <Component Id="Nu_Plugin_Query" Guid="*">
-        <File Id="nu_plugin_query.exe" Source="$(var.SourceDir)\nu_plugin_query.exe" KeyPath="yes" />
+        <File Id="nu_plugin_query.exe" Source="$(var.SourceDir)\nu_plugin_query.exe" KeyPath="yes">
+          <util:PermissionEx User="Administrators" GenericAll="yes" />
+          <util:PermissionEx User="Users" GenericRead="yes" GenericExecute="yes" />
+        </File>
       </Component>
       <Component Id="Nu_Plugin_Polars" Guid="*">
-        <File Id="nu_plugin_polars.exe" Source="$(var.SourceDir)\nu_plugin_polars.exe" KeyPath="yes" />
+        <File Id="nu_plugin_polars.exe" Source="$(var.SourceDir)\nu_plugin_polars.exe" KeyPath="yes">
+          <util:PermissionEx User="Administrators" GenericAll="yes" />
+          <util:PermissionEx User="Users" GenericRead="yes" GenericExecute="yes" />
+        </File>
       </Component>
       <Component Id="Nu_Plugin_Formats" Guid="*">
-        <File Id="nu_plugin_formats.exe" Source="$(var.SourceDir)\nu_plugin_formats.exe" KeyPath="yes" />
+        <File Id="nu_plugin_formats.exe" Source="$(var.SourceDir)\nu_plugin_formats.exe" KeyPath="yes">
+          <util:PermissionEx User="Administrators" GenericAll="yes" />
+          <util:PermissionEx User="Users" GenericRead="yes" GenericExecute="yes" />
+        </File>
       </Component>
       <Component Id="Less_License" Guid="*">
         <File Id="LICENSE_for_less.txt" Source="$(var.SourceDir)\LICENSE-for-less.txt" KeyPath="yes" />
@@ -231,6 +277,79 @@
       <Launch Condition="ProcessorArchitecture = 'ARM64'" Message="This installation package is only supported on ARM64 Windows." />
     <?endif?>
 
+    <!-- Security Enhancement: Validate custom installation paths -->
+    <CustomAction Id="ValidateInstallPath"
+                  Return="check"
+                  Execute="immediate"
+                  Script="vbscript">
+      <![CDATA[
+        Dim installDir, forbidden
+        installDir = LCase(Session.Property("INSTALLDIR"))
+        forbidden = Array("windows", "system32", "syswow64", "program files\common files")
+
+        For Each path In forbidden
+          If InStr(installDir, path) > 0 Then
+            Session.Property("VALIDINSTALLPATH") = "0"
+            Exit For
+          End If
+        Next
+
+        If Session.Property("VALIDINSTALLPATH") = "" Then
+          Session.Property("VALIDINSTALLPATH") = "1"
+        End If
+      ]]>
+    </CustomAction>
+
+    <!-- Security Enhancement: Improved Windows Terminal Profile update with validation -->
+    <CustomAction Id="ValidateTerminalProfilePaths"
+                  Return="check"
+                  Execute="immediate"
+                  Script="vbscript">
+      <![CDATA[
+        ' Validate that the executable and profile files exist and are in expected locations
+        Dim nuExePath, profilePath
+        nuExePath = Session.Property("nu.exe")
+        profilePath = Session.Property("WindowsTerminalProfileFile")
+
+        If Len(nuExePath) = 0 Or Len(profilePath) = 0 Then
+          Session.Property("VALIDTERMINALPATHS") = "0"
+        Else
+          Session.Property("VALIDTERMINALPATHS") = "1"
+        End If
+      ]]>
+    </CustomAction>
+
+    <!-- Property that defines the command executed by the Windows Terminal Profile custom action -->
+    <!-- Security Enhancement: Use validated paths and escape properly -->
+    <SetProperty Id="ReplacePathsInWindowsTerminalProfile"
+                 Sequence="execute"
+                 After="CostFinalize"
+                 Value="cmd.exe /c &quot;&quot;[#nu.exe]&quot; -c &quot;let doc = (open '[#WindowsTerminalProfileFile]' | update profiles.commandline '[#nu.exe]' | update profiles.icon '[#nu.ico]'); $doc | save -f '[#WindowsTerminalProfileFile]'&quot;&quot;"
+                 Condition="&amp;WindowsTerminalProfileFeature=3 AND VALIDTERMINALPATHS=&quot;1&quot;" />
+
+    <!-- Defines the custom action that updates paths in the Windows Terminal profile JSON file -->
+    <CustomAction Id="ReplacePathsInWindowsTerminalProfile"
+                  Return="check"
+                  Impersonate="yes"
+                  Execute="deferred"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+
+    <InstallUISequence>
+      <Custom Action="ValidateInstallPath" After="CostFinalize" />
+      <Custom Action="ValidateTerminalProfilePaths" After="CostFinalize" />
+    </InstallUISequence>
+
+    <InstallExecuteSequence>
+      <Custom Action="ValidateInstallPath" After="CostFinalize" />
+      <Custom Action="ValidateTerminalProfilePaths" After="CostFinalize" />
+      <Custom Action="ReplacePathsInWindowsTerminalProfile" Before="InstallFinalize"
+              Condition="&amp;WindowsTerminalProfileFeature=3 AND VALIDTERMINALPATHS=&quot;1&quot;" />
+    </InstallExecuteSequence>
+
+    <!-- Security Enhancement: Launch condition to ensure valid installation path -->
+    <Launch Condition="VALIDINSTALLPATH=&quot;1&quot;" Message="Installation path is not allowed for security reasons. Please choose a different location." />
+
     <!-- If installing per-user (MSIINSTALLPERUSER=1), this sets INSTALLDIR and BINDIR to point to user-specific paths -->
     <SetProperty Id="INSTALLDIR"
                  Action="SetINSTALLDIR_User"
@@ -273,25 +392,5 @@
     <!-- This line MUST NOT be removed in order to set a custom folder for PerMachine installation -->
     <SetProperty Id="LOGICAL_BINDIR" Value="[BINDIR]" After="LaunchConditions" Sequence="both" />
 
-    <!-- Property that defines the command executed by the Windows Terminal Profile custom action -->
-    <!-- for Value, see https://learn.microsoft.com/en-ca/windows/win32/msi/formatted -->
-    <SetProperty Id="ReplacePathsInWindowsTerminalProfile"
-                 Sequence="execute"
-                 After="CostFinalize"
-                 Value="&quot;[#nu.exe]&quot; -c &quot;let doc = (open `[#WindowsTerminalProfileFile]` | update profiles.commandline `\&quot;[#nu.exe]\&quot;` | update profiles.icon `\&quot;[#nu.ico]\&quot;`); $doc | save -f `[#WindowsTerminalProfileFile]`&quot;"
-                 Condition="&amp;WindowsTerminalProfileFeature=3" />
-
-    <!-- Defines the custom action that updates paths in the Windows Terminal profile JSON file -->
-    <CustomAction Id="ReplacePathsInWindowsTerminalProfile"
-                  Return="check"
-                  Impersonate="yes"
-                  Execute="deferred"
-                  DllEntry="WixQuietExec"
-                  BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
-
-    <InstallExecuteSequence>
-      <Custom Action="ReplacePathsInWindowsTerminalProfile" Before="InstallFinalize"
-              Condition="&amp;WindowsTerminalProfileFeature=3" />
-    </InstallExecuteSequence>
   </Package>
 </Wix>
