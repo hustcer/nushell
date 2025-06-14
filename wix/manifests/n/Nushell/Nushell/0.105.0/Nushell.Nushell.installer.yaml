@@ -13,17 +13,17 @@ InstallModes:
 UpgradeBehavior: install
 Commands:
 - nu
-ProductCode: '{362D534B-9A5F-46FB-93DA-6193CD3C2080}'
+ProductCode: '{206E38EC-2C41-48A7-91DA-77F7478A4E0F}'
 ReleaseDate: 2025-06-14
 AppsAndFeaturesEntries:
 - DisplayName: Nushell
-  ProductCode: '{362D534B-9A5F-46FB-93DA-6193CD3C2080}'
+  ProductCode: '{206E38EC-2C41-48A7-91DA-77F7478A4E0F}'
   UpgradeCode: '{82D756D2-19FA-4F09-B10F-64942E89F364}'
 InstallationMetadata:
   DefaultInstallLocation: nu
 Installers:
 - Architecture: x64
   InstallerUrl: https://terminus-new-trantor.oss-cn-hangzhou.aliyuncs.com/open-tools/misc/nu-0.105.0-x86_64-pc-windows-msvc.msi
-  InstallerSha256: 376F861835444B5B35117A6292A8E63927BC07D738793CD1A86791F87B9C7AA4
+  InstallerSha256: EC7A52FD241524036D0CC92239B59224AD9338ACD70C93B2573FC792AD0399AF
 ManifestType: installer
 ManifestVersion: 1.10.0
