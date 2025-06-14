@@ -16,7 +16,15 @@
   <?define UpgradeCode = "82D756D2-19FA-4F09-B10F-64942E89F364" ?>
 
   <!-- https://docs.firegiant.com/wix/schema/wxs/package/ -->
+  <!--
+    ProductCode="*" Ensure that a new, unique ProductCode is generated each time a
+    new MSI installation package is built. This ensures that when a new version of
+    Nushell is released and upgraded through winget, Windows Installer can correctly
+    identify this as a major version upgrade and complete the installation process
+    smoothly.
+  -->
   <Package
+    ProductCode="*"
     Compressed="yes"
     Id="Nushell.Nushell"
     InstallerVersion="500"
