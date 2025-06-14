@@ -5,7 +5,6 @@ PackageIdentifier: Nushell.Nushell
 PackageVersion: 0.105.2
 InstallerLocale: en-US
 InstallerType: wix
-Scope: user
 InstallModes:
 - interactive
 - silent
@@ -23,6 +22,12 @@ InstallationMetadata:
   DefaultInstallLocation: nu
 Installers:
 - Architecture: x64
+  Scope: user
+  InstallerUrl: https://terminus-new-trantor.oss-cn-hangzhou.aliyuncs.com/open-tools/misc/nu-0.105.2-x86_64-pc-windows-msvc.msi
+  InstallerSha256: 2A4227BC8D860A7EAF0A5590DAE899E81E2313D13B77E7733578C2ED6DD5E208
+- Architecture: x64
+  Scope: machine
+  ElevationRequirement: elevationRequired
   InstallerUrl: https://terminus-new-trantor.oss-cn-hangzhou.aliyuncs.com/open-tools/misc/nu-0.105.2-x86_64-pc-windows-msvc.msi
   InstallerSha256: 2A4227BC8D860A7EAF0A5590DAE899E81E2313D13B77E7733578C2ED6DD5E208
 ManifestType: installer
