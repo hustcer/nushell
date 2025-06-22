@@ -1,0 +1,38 @@
+# Created with komac v2.12.0
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+
+PackageIdentifier: Nushell.Nushell
+PackageVersion: 0.105.2
+InstallerLocale: en-US
+InstallerType: wix
+InstallModes:
+- interactive
+- silent
+- silentWithProgress
+UpgradeBehavior: install
+Commands:
+- nu
+ProductCode: '{E06E6FF6-43B3-4E7A-A5F3-A57F16481DC2}'
+ReleaseDate: 2025-06-14
+AppsAndFeaturesEntries:
+- DisplayName: Nushell
+  ProductCode: '{E06E6FF6-43B3-4E7A-A5F3-A57F16481DC2}'
+  UpgradeCode: '{82D756D2-19FA-4F09-B10F-64942E89F364}'
+InstallationMetadata:
+  DefaultInstallLocation: nu
+Installers:
+- Architecture: x64
+  Scope: user
+  InstallerSwitches:
+    Custom: MSIINSTALLPERUSER=1
+  InstallerUrl: https://terminus-new-trantor.oss-cn-hangzhou.aliyuncs.com/open-tools/misc/nu-0.105.2-x86_64-pc-windows-msvc.msi
+  InstallerSha256: BAFE503B1185BD1B84E5542DAF011B541167CA93243EE94A631222069315A333
+- Architecture: x64
+  Scope: machine
+  InstallerSwitches:
+    Custom: ALLUSERS=1
+  ElevationRequirement: elevationRequired
+  InstallerUrl: https://terminus-new-trantor.oss-cn-hangzhou.aliyuncs.com/open-tools/misc/nu-0.105.2-x86_64-pc-windows-msvc.msi
+  InstallerSha256: BAFE503B1185BD1B84E5542DAF011B541167CA93243EE94A631222069315A333
+ManifestType: installer
+ManifestVersion: 1.10.0
