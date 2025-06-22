@@ -24,7 +24,7 @@ Installers:
 - Architecture: x64
   Scope: user
   InstallerSwitches:
-    Custom: MSIINSTALLPERUSER=1
+    Custom: ALLUSERS=2 MSIINSTALLPERUSER=1
   InstallerUrl: https://terminus-new-trantor.oss-cn-hangzhou.aliyuncs.com/open-tools/misc/nu-0.105.0-x86_64-pc-windows-msvc.msi
   InstallerSha256: 2C29915A17CD1F55952D6186D8616E2E808DBD65FA298F683735F652C6F8922E
 - Architecture: x64
