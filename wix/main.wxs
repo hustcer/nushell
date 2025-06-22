@@ -237,7 +237,7 @@
     <!-- If installing per-machine (ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1), this sets INSTALLDIR and BINDIR to point to machine-wide (Program Files) paths -->
     <SetProperty Id="INSTALLDIR"
                  Action="SetINSTALLDIR_Machine"
-                 Value="[APPLICATIONFOLDER]"
+                 Value="[ProgramFiles64Folder]$(var.ApplicationFolderName)"
                  After="LaunchConditions"
                  Condition="ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1"
                  Sequence="both" />
