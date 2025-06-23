@@ -35,11 +35,11 @@
     <Media Id="1" Cabinet="cab1.cab" EmbedCab="yes" />
 
     <!-- Allow install for Current User Or Machine -->
-    <Property Id="WixUISupportPerUser" Value="1" />
-    <Property Id="WixUISupportPerMachine" Value="1" />
+    <Property Id="WixUISupportPerUser" Value="1" Secure="yes" />
+    <Property Id="WixUISupportPerMachine" Value="1" Secure="yes" />
     <!-- Install for PerUser by default -->
     <!-- If set to WixPerMachineFolder will install for PerMachine by default -->
-    <Property Id="WixAppFolder" Value="WixLocalAppDataFolder" />
+    <Property Id="WixAppFolder" Value="WixLocalAppDataFolder" Secure="yes" />
 
     <!-- Workaround Wix Bug: https://github.com/wixtoolset/issues/issues/2165 -->
     <!-- The suggested folder in the dest folder dialog should be C:\Program Files\nu -->
@@ -61,7 +61,7 @@
     <Icon Id="ProductIconId" SourceFile="$(var.ProjectDir)/nu.ico"/>
     <Property Id="ARPPRODUCTICON" Value="ProductIconId" />
     <Property Id='ARPHELPLINK' Value='https://www.nushell.sh/book/' />
-    <Property Id="ApplicationFolderName" Value="$(var.ApplicationFolderName)" />
+    <Property Id="ApplicationFolderName" Value="$(var.ApplicationFolderName)" Secure="yes" />
 
     <!-- INSTALLDIR is the logical target directory whose path will be set by the INSTALLDIR property. -->
     <Directory Id="INSTALLDIR" Name="$(var.ApplicationFolderName)">
