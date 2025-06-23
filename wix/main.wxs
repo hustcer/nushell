@@ -225,7 +225,7 @@
                  Action="SetINSTALLDIR_User"
                  Value="[LocalAppDataFolder]Programs\$(var.ApplicationFolderName)"
                  After="LaunchConditions"
-                 Condition="MSIINSTALLPERUSER=1"
+                 Condition="MSIINSTALLPERUSER=1 AND NOT (UILevel=2 AND INSTALLDIR)"
                  Sequence="both" />
     <SetProperty Id="BINDIR"
                  Action="SetBINDIR_User"
@@ -239,7 +239,7 @@
                  Action="SetINSTALLDIR_Machine"
                  Value="[ProgramFiles64Folder]$(var.ApplicationFolderName)"
                  After="LaunchConditions"
-                 Condition="ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1"
+                 Condition="ALLUSERS=1 AND NOT MSIINSTALLPERUSER=1 AND NOT (UILevel=2 AND INSTALLDIR)"
                  Sequence="both" />
 
     <!-- Override APPLICATIONFOLDER for 64-bit installations -->
