@@ -244,7 +244,7 @@ impl EngineState {
         self.vars.extend(delta.vars);
         self.spans.extend(delta.spans);
         self.doccomments.merge_with(delta.doccomments);
-        
+
         // Clean up unused variables to prevent memory leaks from variable shadowing
         self.cleanup_unused_variables();
 
@@ -378,16 +378,16 @@ impl EngineState {
     /// This removes Variable entries that are no longer referenced by any overlay.
     fn cleanup_unused_variables(&mut self) {
         use std::collections::HashSet;
-        
+
         // Collect all VarIds that are still referenced by overlays
         let mut referenced_vars = HashSet::new();
-        
+
         for overlay_frame in self.scope.overlays.iter() {
             for var_id in overlay_frame.1.vars.values() {
                 referenced_vars.insert(*var_id);
             }
         }
-        
+
         // Find variables with large const_val that are no longer referenced
         let mut vars_to_clear = Vec::new();
         for (idx, var) in self.vars.iter().enumerate() {
@@ -402,7 +402,7 @@ impl EngineState {
                 }
             }
         }
-        
+
         // Clear const_val for unreferenced variables to free memory
         for idx in vars_to_clear {
             if let Some(var) = self.vars.get_mut(idx) {
