@@ -210,12 +210,18 @@ pub fn evaluate_repl(
                 // we apply the changes from the updated stack back onto our previous stack
                 let mut merged_stack = Stack::with_changes_from_child(previous_stack_arc, s);
 
-                // Only clean up variables if overlays actually changed (indicating potential variable shadowing)
-                let overlays_changed = previous_engine_state.scope.overlays.len()
-                    != es.scope.overlays.len()
-                    || previous_engine_state.scope.overlays != es.scope.overlays;
+                // Only clean up variables if variable count changed (indicating potential variable shadowing)
+                let prev_var_count: usize = previous_engine_state.scope.overlays
+                    .iter()
+                    .map(|(_, overlay)| overlay.vars.len())
+                    .sum();
+                let curr_var_count: usize = es.scope.overlays
+                    .iter()
+                    .map(|(_, overlay)| overlay.vars.len())
+                    .sum();
+                let variables_added = curr_var_count > prev_var_count;
 
-                if overlays_changed {
+                if variables_added {
                     // Clean up unused variables from stack to prevent memory leaks from variable shadowing
                     es.cleanup_stack_variables(&mut merged_stack);
                 }
