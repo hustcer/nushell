@@ -371,21 +371,15 @@ impl EngineState {
         Ok(())
     }
 
-    /// Clean up unused variables from a Stack to prevent memory leaks.
-    /// This removes variables that are no longer referenced by any overlay.
+    /// Clean up shadowed variables from a Stack to prevent memory leaks.
+    /// With HashMap, this is much more efficient as we only remove specific shadowed variables.
     pub fn cleanup_stack_variables(&mut self, stack: &mut Stack) {
-        use std::collections::HashSet;
-
-        let mut shadowed_vars = HashSet::new();
+        // Collect and remove shadowed variables directly
         for (_, frame) in self.scope.overlays.iter_mut() {
-            shadowed_vars.extend(frame.shadowed_vars.to_owned());
-            frame.shadowed_vars.clear();
+            for var_id in frame.shadowed_vars.drain(..) {
+                stack.vars.remove(&var_id);
+            }
         }
-
-        // Remove variables from stack that are no longer referenced
-        stack
-            .vars
-            .retain(|(var_id, _)| !shadowed_vars.contains(var_id));
     }
 
     pub fn active_overlay_ids<'a, 'b>(

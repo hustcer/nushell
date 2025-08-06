@@ -36,8 +36,8 @@ pub type EnvVars = HashMap<String, HashMap<String, Value>>;
 /// use the Stack as a way of representing the local and closure-captured state.
 #[derive(Debug, Clone)]
 pub struct Stack {
-    /// Variables
-    pub vars: Vec<(VarId, Value)>,
+    /// Variables - using HashMap for O(1) access and automatic deduplication
+    pub vars: HashMap<VarId, Value>,
     /// Environment variables arranged as a stack to be able to recover values from parent scopes
     pub env_vars: Vec<Arc<EnvVars>>,
     /// Tells which environment variables from engine state are hidden, per overlay.
@@ -73,7 +73,7 @@ impl Stack {
     /// (as opposed to a [`PipelineData`](crate::PipelineData)).
     pub fn new() -> Self {
         Self {
-            vars: Vec::new(),
+            vars: HashMap::new(),
             env_vars: Vec::new(),
             env_hidden: Arc::new(HashMap::new()),
             active_overlays: vec![DEFAULT_OVERLAY_NAME.to_string()],
@@ -100,7 +100,7 @@ impl Stack {
             arguments: ArgumentStack::new(),
             error_handlers: ErrorHandlerStack::new(),
             recursion_count: parent.recursion_count,
-            vars: vec![],
+            vars: HashMap::new(),
             parent_deletions: vec![],
             config: parent.config.clone(),
             out_dest: parent.out_dest.clone(),
@@ -120,12 +120,12 @@ impl Stack {
         drop(child.parent_stack);
         let mut unique_stack = Arc::unwrap_or_clone(parent);
 
-        unique_stack
-            .vars
-            .retain(|(var, _)| !child.parent_deletions.contains(var));
-        for (var, value) in child.vars {
-            unique_stack.add_var(var, value);
+        // Remove variables marked for deletion
+        for var_id in &child.parent_deletions {
+            unique_stack.vars.remove(var_id);
         }
+        // Merge child variables directly into HashMap (automatic deduplication)
+        unique_stack.vars.extend(child.vars);
         unique_stack.env_vars = child.env_vars;
         unique_stack.env_hidden = child.env_hidden;
         unique_stack.active_overlays = child.active_overlays;
@@ -150,10 +150,9 @@ impl Stack {
 
     /// Lookup a variable, returning None if it is not present
     fn lookup_var(&self, var_id: VarId) -> Option<Value> {
-        for (id, val) in &self.vars {
-            if var_id == *id {
-                return Some(val.clone());
-            }
+        // O(1) HashMap lookup
+        if let Some(value) = self.vars.get(&var_id) {
+            return Some(value.clone());
         }
 
         if let Some(stack) = &self.parent_stack {
@@ -227,23 +226,13 @@ impl Stack {
     }
 
     pub fn add_var(&mut self, var_id: VarId, value: Value) {
-        //self.vars.insert(var_id, value);
-        for (id, val) in &mut self.vars {
-            if *id == var_id {
-                *val = value;
-                return;
-            }
-        }
-        self.vars.push((var_id, value));
+        // O(1) HashMap insertion with automatic deduplication
+        self.vars.insert(var_id, value);
     }
 
     pub fn remove_var(&mut self, var_id: VarId) {
-        for (idx, (id, _)) in self.vars.iter().enumerate() {
-            if *id == var_id {
-                self.vars.remove(idx);
-                break;
-            }
-        }
+        // O(1) HashMap removal
+        self.vars.remove(&var_id);
         // even if we did have it in the original layer, we need to make sure to remove it here
         // as well (since the previous update might have simply hid the parent value)
         if self.parent_stack.is_some() {
@@ -309,7 +298,7 @@ impl Stack {
         env_vars.push(Arc::new(HashMap::new()));
 
         Stack {
-            vars: captures,
+            vars: captures.into_iter().collect(),
             env_vars,
             env_hidden: self.env_hidden.clone(),
             active_overlays: self.active_overlays.clone(),
@@ -342,7 +331,7 @@ impl Stack {
         env_vars.push(Arc::new(HashMap::new()));
 
         Stack {
-            vars,
+            vars: vars.into_iter().collect(),
             env_vars,
             env_hidden: self.env_hidden.clone(),
             active_overlays: self.active_overlays.clone(),

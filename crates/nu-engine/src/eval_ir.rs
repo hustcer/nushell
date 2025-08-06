@@ -1252,7 +1252,7 @@ fn gather_arguments(
             // For named arguments, we do this check by looking to see if the variable was set yet on
             // the stack. This assumes that the stack's variables was previously empty, but that's a
             // fair assumption for a brand new callee stack.
-            if !callee_stack.vars.iter().any(|(id, _)| *id == var_id) {
+            if !callee_stack.vars.contains_key(&var_id) {
                 let val = if named_arg.arg.is_none() {
                     Value::bool(false, call_head)
                 } else if let Some(value) = &named_arg.default_value {
