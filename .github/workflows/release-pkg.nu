@@ -93,19 +93,10 @@ if $os in ['macos-latest'] or $USE_UBUNTU {
             cargo-build-nu
         }
         'loongarch64-unknown-linux-gnu' => {
-            aria2c https://github.com/loongson/build-tools/releases/download/2025.08.08/x86_64-cross-tools-loongarch64-binutils_2.45-gcc_15.1.0-glibc_2.42.tar.xz
-            tar xf x86_64-cross-tools-loongarch64-*.tar.xz
-            $env.PATH = ($env.PATH | split row (char esep) | prepend $'($env.PWD)/cross-tools/bin')
-            $env.CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_LINKER = 'loongarch64-unknown-linux-gnu-gcc'
-            cargo-build-nu
+            cargo-build-nu --cross
         }
         'loongarch64-unknown-linux-musl' => {
-            print $"(ansi g)Downloading LoongArch64 musl cross-compilation toolchain...(ansi reset)"
-            aria2c -q https://github.com/LoongsonLab/oscomp-toolchains-for-oskernel/releases/download/loongarch64-linux-musl-cross-novec/loongarch64-linux-musl-cross-novec.tgz
-            tar -xf loongarch64-linux-musl-cross-novec.tgz
-            $env.PATH = ($env.PATH | split row (char esep) | prepend $'($env.PWD)/loongarch64-linux-musl-cross-novec/bin')
-            $env.CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_MUSL_LINKER = "loongarch64-linux-musl-gcc"
-            cargo-build-nu
+            cargo-build-nu --cross
         }
         _ => {
             # musl-tools to fix 'Failed to find tool. Is `musl-gcc` installed?'
@@ -229,11 +220,16 @@ def fetch-less [
     rm $less_zip lesskey.exe
 }
 
-def 'cargo-build-nu' [] {
+def 'cargo-build-nu' [--cross] {
     if $os =~ 'windows' {
         cargo build --release --all --target $target
     } else {
-        cargo build --release --all --target $target --features=static-link-openssl
+        if $cross {
+            cargo install cross
+            cross build --release --all --target $target
+        } else {
+            cargo build --release --all --target $target --features=static-link-openssl
+        }
     }
 }
 
