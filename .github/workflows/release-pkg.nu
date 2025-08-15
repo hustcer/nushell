@@ -93,7 +93,7 @@ if $os in ['macos-latest'] or $USE_UBUNTU {
             cargo-build-nu
         }
         'loongarch64-unknown-linux-gnu' => {
-            aria2c https://github.com/loongson/build-tools/releases/download/2024.08.08/x86_64-cross-tools-loongarch64-binutils_2.43-gcc_14.2.0-glibc_2.40.tar.xz
+            aria2c https://github.com/loongson/build-tools/releases/download/2025.08.08/x86_64-cross-tools-loongarch64-binutils_2.45-gcc_15.1.0-glibc_2.42.tar.xz
             tar xf x86_64-cross-tools-loongarch64-*.tar.xz
             $env.PATH = ($env.PATH | split row (char esep) | prepend $'($env.PWD)/cross-tools/bin')
             $env.CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_LINKER = 'loongarch64-unknown-linux-gnu-gcc'
@@ -101,9 +101,9 @@ if $os in ['macos-latest'] or $USE_UBUNTU {
         }
         'loongarch64-unknown-linux-musl' => {
             print $"(ansi g)Downloading LoongArch64 musl cross-compilation toolchain...(ansi reset)"
-            aria2c -q https://github.com/LoongsonLab/oscomp-toolchains-for-oskernel/releases/download/loongarch64-linux-musl-cross-gcc-13.2.0/loongarch64-linux-musl-cross.tgz
-            tar -xf loongarch64-linux-musl-cross.tgz
-            $env.PATH = ($env.PATH | split row (char esep) | prepend $'($env.PWD)/loongarch64-linux-musl-cross/bin')
+            aria2c -q https://github.com/LoongsonLab/oscomp-toolchains-for-oskernel/releases/download/loongarch64-linux-musl-cross-novec/loongarch64-linux-musl-cross-novec.tgz
+            tar -xf loongarch64-linux-musl-cross-novec.tgz
+            $env.PATH = ($env.PATH | split row (char esep) | prepend $'($env.PWD)/loongarch64-linux-musl-cross-novec/bin')
             $env.CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_MUSL_LINKER = "loongarch64-linux-musl-gcc"
             cargo-build-nu
         }
