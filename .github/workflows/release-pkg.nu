@@ -93,12 +93,12 @@ if $os in ['macos-latest'] or $USE_UBUNTU {
             cargo-build-nu
         }
         'loongarch64-unknown-linux-gnu' => {
-            aria2c https://github.com/loongson/build-tools/releases/download/2025.08.08/x86_64-cross-tools-loongarch64-binutils_2.45-gcc_15.1.0-glibc_2.42.tar.xz
+            aria2c https://github.com/loongson/build-tools/releases/download/2024.11.01/x86_64-cross-tools-loongarch64-binutils_2.43.1-gcc_14.2.0-glibc_2.40.tar.xz
             tar xf x86_64-cross-tools-loongarch64-*.tar.xz
             $env.PATH = ($env.PATH | split row (char esep) | prepend $'($env.PWD)/cross-tools/bin')
             $env.CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_LINKER = 'loongarch64-unknown-linux-gnu-gcc'
-            # Simplified workaround for newer GCC 15.1.0 toolchain - only need panic=abort
-            $env.RUSTFLAGS = "-C panic=abort"
+            # Workaround for Rust 1.87 TLS issues with glibc 2.40 toolchain
+            $env.RUSTFLAGS = "-C panic=abort -C target-feature=+crt-static -C link-arg=-Wl,--allow-multiple-definition"
             $env.CARGO_PROFILE_RELEASE_PANIC = "abort"
             cargo-build-nu
         }
