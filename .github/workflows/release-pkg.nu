@@ -97,9 +97,8 @@ if $os in ['macos-latest'] or $USE_UBUNTU {
             tar xf x86_64-cross-tools-loongarch64-*.tar.xz
             $env.PATH = ($env.PATH | split row (char esep) | prepend $'($env.PWD)/cross-tools/bin')
             $env.CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_LINKER = 'loongarch64-unknown-linux-gnu-gcc'
-            # Workaround for Rust 1.87 TLS issues: use abort panic strategy and simplified codegen
-            $env.RUSTFLAGS = "-C target-feature=+crt-static -C panic=abort -C codegen-units=1 -C link-arg=-Wl,--allow-multiple-definition"
-            # Use release profile with panic=abort for all targets to avoid TLS-dependent panic handling
+            # Simplified workaround for newer GCC 15.1.0 toolchain - only need panic=abort
+            $env.RUSTFLAGS = "-C panic=abort"
             $env.CARGO_PROFILE_RELEASE_PANIC = "abort"
             cargo-build-nu
         }
