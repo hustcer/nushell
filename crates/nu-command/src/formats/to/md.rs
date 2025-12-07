@@ -7,12 +7,38 @@ use std::collections::HashSet;
 #[derive(Clone)]
 pub struct ToMd;
 
+/// Defines how lists should be formatted in Markdown output
+#[derive(Clone, Copy, Default, PartialEq)]
+enum ListStyle {
+    /// No list markers, just plain text separated by newlines
+    None,
+    /// Ordered list using "1. ", "2. ", etc.
+    Ordered,
+    /// Unordered list using "* " (default)
+    #[default]
+    Unordered,
+}
+
+impl ListStyle {
+    const OPTIONS: &[&'static str] = &["ordered", "unordered", "none"];
+
+    fn from_str(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "ordered" | "o" => Some(Self::Ordered),
+            "unordered" | "u" => Some(Self::Unordered),
+            "none" | "n" => Some(Self::None),
+            _ => None,
+        }
+    }
+}
+
 struct ToMdOptions {
     pretty: bool,
     per_element: bool,
     center: Option<Vec<CellPath>>,
     escape_md: bool,
     escape_html: bool,
+    list_style: ListStyle,
 }
 
 impl Command for ToMd {
@@ -50,6 +76,12 @@ impl Command for ToMd {
                 "Escapes both Markdown and HTML special characters",
                 Some('a'),
             )
+            .named(
+                "list",
+                SyntaxShape::String,
+                "Format lists as 'ordered' (1. 2. 3.), 'unordered' (* * *), or 'none'. Default: unordered",
+                Some('l'),
+            )
             .category(Category::Formats)
     }
 
@@ -81,9 +113,9 @@ impl Command for ToMd {
                 )),
             },
             Example {
-                description: "Render a list",
-                example: "[0 1 2] | to md --pretty",
-                result: Some(Value::test_string("0\n1\n2")),
+                description: "Render a list (unordered by default)",
+                example: "[0 1 2] | to md",
+                result: Some(Value::test_string("* 0\n* 1\n* 2")),
             },
             Example {
                 description: "Separate list into markdown tables",
@@ -113,6 +145,16 @@ impl Command for ToMd {
                     "| a | b |\n| --- | --- |\n| p | &lt;p&gt;Welcome to nushell&lt;&#x2f;p&gt; |",
                 )),
             },
+            Example {
+                description: "Render a list as an ordered markdown list",
+                example: "[one two three] | to md --list ordered",
+                result: Some(Value::test_string("1. one\n2. two\n3. three")),
+            },
+            Example {
+                description: "Render a list without markers",
+                example: "[one two three] | to md --list none",
+                result: Some(Value::test_string("one\ntwo\nthree")),
+            },
         ]
     }
 
@@ -131,6 +173,18 @@ impl Command for ToMd {
         let escape_html = call.has_flag(engine_state, stack, "escape-html")?;
         let escape_both = call.has_flag(engine_state, stack, "escape-all")?;
         let center: Option<Vec<CellPath>> = call.get_flag(engine_state, stack, "center")?;
+        let list_style_str: Option<Spanned<String>> = call.get_flag(engine_state, stack, "list")?;
+
+        let list_style = match &list_style_str {
+            Some(spanned) => {
+                ListStyle::from_str(&spanned.item).ok_or_else(|| ShellError::InvalidValue {
+                    valid: format!("one of {}", ListStyle::OPTIONS.join(", ")),
+                    actual: spanned.item.clone(),
+                    span: spanned.span,
+                })?
+            }
+            None => ListStyle::default(),
+        };
 
         let config = stack.get_config(engine_state);
 
@@ -142,6 +196,7 @@ impl Command for ToMd {
                 center,
                 escape_md: escape_md || escape_both,
                 escape_html: escape_html || escape_both,
+                list_style,
             },
             &config,
             head,
@@ -161,12 +216,36 @@ fn to_md(
         .unwrap_or_default()
         .with_content_type(Some("text/markdown".into()));
 
+    // When list_style is specified, format as a list directly without grouping
+    if options.list_style != ListStyle::None {
+        let values: Vec<Value> = input.into_iter().collect();
+        let result = values
+            .into_iter()
+            .enumerate()
+            .map(|(idx, val)| {
+                format_list_item(
+                    val,
+                    idx,
+                    options.list_style,
+                    options.escape_md,
+                    options.escape_html,
+                    config,
+                )
+            })
+            .collect::<Vec<String>>()
+            .join("")
+            .trim()
+            .to_string();
+        return Ok(Value::string(result, head).into_pipeline_data_with_metadata(Some(metadata)));
+    }
+
     let (grouped_input, single_list) = group_by(input, head, config);
     if options.per_element || single_list {
         return Ok(Value::string(
             grouped_input
                 .into_iter()
-                .map(move |val| match val {
+                .enumerate()
+                .map(|(idx, val)| match val {
                     Value::List { .. } => {
                         format!(
                             "{}\n\n",
@@ -180,10 +259,10 @@ fn to_md(
                             )
                         )
                     }
-                    other => fragment(
+                    other => format_list_item(
                         other,
-                        options.pretty,
-                        &options.center,
+                        idx,
+                        options.list_style,
                         options.escape_md,
                         options.escape_html,
                         config,
@@ -208,6 +287,47 @@ fn to_md(
         head,
     )
     .into_pipeline_data_with_metadata(Some(metadata)))
+}
+
+/// Formats a single list item with the appropriate list marker based on list_style
+fn format_list_item(
+    input: Value,
+    index: usize,
+    list_style: ListStyle,
+    escape_md: bool,
+    escape_html: bool,
+    config: &Config,
+) -> String {
+    // For Record values, delegate to fragment() for special markdown handling (h1, h2, etc.)
+    if let Value::Record { val, .. } = &input {
+        if let Some((header, _)) = val.get_index(0) {
+            if val.len() == 1 {
+                let lower_header = header.to_ascii_lowercase();
+                if matches!(lower_header.as_str(), "h1" | "h2" | "h3" | "blockquote") {
+                    return fragment(input, false, &None, escape_md, escape_html, config);
+                }
+            }
+        }
+    }
+
+    let value_string = input.to_expanded_string("|", config);
+    let escaped = escape_markdown_characters(
+        if escape_html {
+            v_htmlescape::escape(&value_string).to_string()
+        } else {
+            value_string
+        },
+        escape_md,
+        false,
+    );
+
+    let prefix = match list_style {
+        ListStyle::Ordered => format!("{}. ", index + 1),
+        ListStyle::Unordered => "* ".to_string(),
+        ListStyle::None => String::new(),
+    };
+
+    format!("{}{}\n", prefix, escaped)
 }
 
 fn escape_markdown_characters(input: String, escape_md: bool, for_table: bool) -> String {
@@ -1224,5 +1344,94 @@ mod tests {
             | table | &lt;table&gt;&lt;tr&gt;&lt;td scope=&quot;row&quot;&gt;Chris&lt;&#x2f;td&gt;&lt;td&gt;HTML tables&lt;&#x2f;td&gt;&lt;td&gt;22&lt;&#x2f;td&gt;&lt;&#x2f;tr&gt;&lt;tr&gt;&lt;td scope=&quot;row&quot;&gt;Dennis&lt;&#x2f;td&gt;&lt;td&gt;Web accessibility&lt;&#x2f;td&gt;&lt;td&gt;45&lt;&#x2f;td&gt;&lt;&#x2f;tr&gt;&lt;&#x2f;table&gt; |
             "#)
         );
+    }
+
+    #[test]
+    fn test_list_ordered() {
+        let value = Value::test_list(vec![
+            Value::test_string("one"),
+            Value::test_string("two"),
+            Value::test_string("three"),
+        ]);
+
+        let result = to_md(
+            value.into_pipeline_data(),
+            ToMdOptions {
+                pretty: false,
+                per_element: false,
+                center: None,
+                escape_md: false,
+                escape_html: false,
+                list_style: ListStyle::Ordered,
+            },
+            &Config::default(),
+            Span::test_data(),
+        )
+        .unwrap()
+        .into_value(Span::test_data())
+        .unwrap()
+        .into_string()
+        .unwrap();
+
+        assert_eq!(result, "1. one\n2. two\n3. three");
+    }
+
+    #[test]
+    fn test_list_unordered() {
+        let value = Value::test_list(vec![
+            Value::test_string("apple"),
+            Value::test_string("banana"),
+            Value::test_string("cherry"),
+        ]);
+
+        let result = to_md(
+            value.into_pipeline_data(),
+            ToMdOptions {
+                pretty: false,
+                per_element: false,
+                center: None,
+                escape_md: false,
+                escape_html: false,
+                list_style: ListStyle::Unordered,
+            },
+            &Config::default(),
+            Span::test_data(),
+        )
+        .unwrap()
+        .into_value(Span::test_data())
+        .unwrap()
+        .into_string()
+        .unwrap();
+
+        assert_eq!(result, "* apple\n* banana\n* cherry");
+    }
+
+    #[test]
+    fn test_list_with_escape_md() {
+        let value = Value::test_list(vec![
+            Value::test_string("*bold*"),
+            Value::test_string("[link]"),
+        ]);
+
+        let result = to_md(
+            value.into_pipeline_data(),
+            ToMdOptions {
+                pretty: false,
+                per_element: false,
+                center: None,
+                escape_md: true,
+                escape_html: false,
+                list_style: ListStyle::Unordered,
+            },
+            &Config::default(),
+            Span::test_data(),
+        )
+        .unwrap()
+        .into_value(Span::test_data())
+        .unwrap()
+        .into_string()
+        .unwrap();
+
+        assert_eq!(result, "* \\*bold\\*\n* \\[link\\]");
     }
 }
