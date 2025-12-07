@@ -41,6 +41,17 @@ struct ToMdOptions {
     list_style: ListStyle,
 }
 
+/// Special markdown element types that can be represented as single-field records
+const SPECIAL_MARKDOWN_HEADERS: &[&str] = &["h1", "h2", "h3", "blockquote"];
+
+/// Check if a record represents a special markdown element (h1, h2, h3, blockquote)
+fn is_special_markdown_record(record: &nu_protocol::Record) -> bool {
+    record.len() == 1
+        && record.get_index(0).is_some_and(|(header, _)| {
+            SPECIAL_MARKDOWN_HEADERS.contains(&header.to_ascii_lowercase().as_str())
+        })
+}
+
 impl Command for ToMd {
     fn name(&self) -> &str {
         "to md"
@@ -216,9 +227,17 @@ fn to_md(
         .unwrap_or_default()
         .with_content_type(Some("text/markdown".into()));
 
-    // When list_style is specified, format as a list directly without grouping
-    if options.list_style != ListStyle::None {
-        let values: Vec<Value> = input.into_iter().collect();
+    // Collect input to check if it's a simple list (no records/tables)
+    let values: Vec<Value> = input.into_iter().collect();
+
+    // Check if input is a simple list (no records, lists, or tables)
+    // Tables in nushell can be represented as List of Records or List of Lists
+    let is_simple_list = !values
+        .iter()
+        .any(|v| matches!(v, Value::Record { .. } | Value::List { .. }));
+
+    // For simple lists, use list_style formatting (default: unordered)
+    if is_simple_list && options.list_style != ListStyle::None {
         let result = values
             .into_iter()
             .enumerate()
@@ -239,13 +258,15 @@ fn to_md(
         return Ok(Value::string(result, head).into_pipeline_data_with_metadata(Some(metadata)));
     }
 
+    // For tables/records, use the grouping logic
+    let input = Value::list(values, head).into_pipeline_data();
     let (grouped_input, single_list) = group_by(input, head, config);
     if options.per_element || single_list {
         return Ok(Value::string(
             grouped_input
                 .into_iter()
                 .enumerate()
-                .map(|(idx, val)| match val {
+                .map(|(idx, val)| match &val {
                     Value::List { .. } => {
                         format!(
                             "{}\n\n",
@@ -259,8 +280,35 @@ fn to_md(
                             )
                         )
                     }
-                    other => format_list_item(
-                        other,
+                    // For records, check if it's a special markdown element (h1, h2, etc.)
+                    Value::Record { val: record, .. } => {
+                        if is_special_markdown_record(record) {
+                            // Special markdown elements use fragment() directly
+                            fragment(
+                                val,
+                                options.pretty,
+                                &options.center,
+                                options.escape_md,
+                                options.escape_html,
+                                config,
+                            )
+                        } else {
+                            // Regular records are rendered as tables
+                            format!(
+                                "{}\n\n",
+                                fragment(
+                                    val,
+                                    options.pretty,
+                                    &options.center,
+                                    options.escape_md,
+                                    options.escape_html,
+                                    config
+                                )
+                            )
+                        }
+                    }
+                    _ => format_list_item(
+                        val,
                         idx,
                         options.list_style,
                         options.escape_md,
@@ -298,18 +346,6 @@ fn format_list_item(
     escape_html: bool,
     config: &Config,
 ) -> String {
-    // For Record values, delegate to fragment() for special markdown handling (h1, h2, etc.)
-    if let Value::Record { val, .. } = &input {
-        if let Some((header, _)) = val.get_index(0) {
-            if val.len() == 1 {
-                let lower_header = header.to_ascii_lowercase();
-                if matches!(lower_header.as_str(), "h1" | "h2" | "h3" | "blockquote") {
-                    return fragment(input, false, &None, escape_md, escape_html, config);
-                }
-            }
-        }
-    }
-
     let value_string = input.to_expanded_string("|", config);
     let escaped = escape_markdown_characters(
         if escape_html {
@@ -365,26 +401,18 @@ fn fragment(
 
     if let Value::Record { val, .. } = &input {
         match val.get_index(0) {
-            Some((header, data)) if val.len() == 1 => {
+            Some((header, data)) if is_special_markdown_record(val) => {
                 let markup = match header.to_ascii_lowercase().as_ref() {
-                    "h1" => "# ".to_string(),
-                    "h2" => "## ".to_string(),
-                    "h3" => "### ".to_string(),
-                    "blockquote" => "> ".to_string(),
-                    _ => {
-                        return table(
-                            input.into_pipeline_data(),
-                            pretty,
-                            center,
-                            escape_md,
-                            escape_html,
-                            config,
-                        );
-                    }
+                    "h1" => "# ",
+                    "h2" => "## ",
+                    "h3" => "### ",
+                    "blockquote" => "> ",
+                    // unreachable because is_special_markdown_record already validated the header
+                    _ => unreachable!(),
                 };
 
                 let value_string = data.to_expanded_string("|", config);
-                out.push_str(&markup);
+                out.push_str(markup);
                 out.push_str(&escape_markdown_characters(
                     if escape_html {
                         v_htmlescape::escape(&value_string).to_string()
