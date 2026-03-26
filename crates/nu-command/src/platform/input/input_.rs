@@ -1,5 +1,6 @@
 use crate::platform::input::legacy_input::LegacyInput;
 use crate::platform::input::reedline_prompt::ReedlinePrompt;
+use crate::platform::input::{require_stdin_terminal, require_stdout_terminal};
 use nu_engine::command_prelude::*;
 use nu_protocol::shell_error::{self, io::IoError};
 use reedline::{
@@ -93,6 +94,9 @@ impl Command for Input {
         if !use_reedline {
             return self.legacy_input(engine_state, stack, call, input);
         }
+
+        require_stdin_terminal(call.head, "input")?;
+        require_stdout_terminal(call.head, "input")?;
 
         let prompt_str: Option<String> = call.opt(engine_state, stack, 0)?;
         let default_val: Option<String> = call.get_flag(engine_state, stack, "default")?;

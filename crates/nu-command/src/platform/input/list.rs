@@ -8,6 +8,7 @@ use crossterm::{
         enable_raw_mode,
     },
 };
+use crate::platform::input::{require_stderr_terminal, require_stdin_terminal};
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use nu_ansi_term::{Style, ansi::RESET};
 use nu_color_config::{Alignment, StyleComputer, TextStyle};
@@ -337,6 +338,8 @@ Use --no-footer and --no-separator to hide the footer and separator line."#
         input: PipelineData,
     ) -> Result<PipelineData, ShellError> {
         let head = call.head;
+        require_stdin_terminal(head, self.name())?;
+        require_stderr_terminal(head, self.name())?;
         let prompt: Option<String> = call.opt(engine_state, stack, 0)?;
         let multi = call.has_flag(engine_state, stack, "multi")?;
         let fuzzy = call.has_flag(engine_state, stack, "fuzzy")?;

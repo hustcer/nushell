@@ -5,6 +5,7 @@ use crossterm::{
     style::Print,
     terminal::{self, ClearType},
 };
+use crate::platform::input::{require_stdin_terminal, require_stdout_terminal};
 use itertools::Itertools;
 use nu_engine::command_prelude::*;
 use nu_protocol::shell_error::{self, io::IoError};
@@ -19,6 +20,8 @@ pub trait LegacyInput {
         call: &Call,
         _input: PipelineData,
     ) -> Result<PipelineData, ShellError> {
+        require_stdin_terminal(call.head, "input")?;
+        require_stdout_terminal(call.head, "input")?;
         let prompt: Option<String> = call.opt(engine_state, stack, 0)?;
         let bytes_until: Option<String> = call.get_flag(engine_state, stack, "bytes-until-any")?;
         let suppress_output = call.has_flag(engine_state, stack, "suppress-output")?;
