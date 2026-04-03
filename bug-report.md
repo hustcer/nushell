@@ -2,29 +2,12 @@
 
 ## 现象
 
-在 Nushell `main` 分支上，`ef1ee9393` 构建出的二进制出现回归，而 `67c15500` 仍然正常。  
+在 Nushell `main` 分支上，`ef1ee9393` 构建出的二进制出现回归，而 `67c15500` 仍然正常。
 通过 `git bisect` 确认，问题由 `f7c7e63a6d3a37bff474d478351f8439eaeeb585` 引入。
-
-用户侧的真实症状是：
-
-```bash
-/Users/hustcer/.cargo/bin/nu -c 'overlay use /Users/hustcer/iWork/terminus/termix-nu/actions/artifact.nu; artifacts -h'
-```
-
-坏版本会报：
-
-```text
-Error: nu::parser::not_found
-```
-
-而好版本 `/Users/hustcer/Applications/nu-nightly/nu` 和当前分支修复后的 `target/debug/nu` 都能正常显示 `artifacts` 的帮助信息。
 
 ## 最小复现
 
-为了去掉对 `termix-nu` 的依赖，当前仓库里增加了两个最小文件：
-
-- [mod.nu](/Users/hustcer/iWork/terminus/nushell/mod.nu)
-- [test.nu](/Users/hustcer/iWork/terminus/nushell/test.nu)
+当前仓库里增加了两个最小文件：
 
 `mod.nu`：
 
@@ -48,9 +31,9 @@ export def main [] {
 
 overlay use mod.nu
 scope commands
-| where name in [helper mod]
-| select name
-| to nuon --raw
+  | where name in [helper mod]
+  | select name
+  | to nuon --raw
 ```
 
 复现命令：
@@ -101,7 +84,7 @@ let cond = {|x| true }
 
 ### 2. 出问题的代码路径
 
-问题出在 [`crates/nu-parser/src/parser.rs`](/Users/hustcer/iWork/terminus/nushell/crates/nu-parser/src/parser.rs) 的 `parse_row_condition()`。
+问题出在 [`crates/nu-parser/src/parser.rs`](nushell/crates/nu-parser/src/parser.rs) 的 `parse_row_condition()`。
 
 这个函数一开始会执行：
 
@@ -150,7 +133,7 @@ working_set.exit_scope();
 
 ## 修复方案
 
-修复点很小，位于 [`crates/nu-parser/src/parser.rs`](/Users/hustcer/iWork/terminus/nushell/crates/nu-parser/src/parser.rs) 的 `parse_row_condition()`。
+修复点很小，位于 [`crates/nu-parser/src/parser.rs`](nushell/crates/nu-parser/src/parser.rs) 的 `parse_row_condition()`。
 
 在这些提前返回分支前补上：
 
@@ -174,9 +157,9 @@ working_set.exit_scope();
 
 除了 parser 修复，当前分支还增加了两个回归测试：
 
-- [`tests/overlays/mod.rs`](/Users/hustcer/iWork/terminus/nushell/tests/overlays/mod.rs)
+- [`tests/overlays/mod.rs`](nushell/tests/overlays/mod.rs)
   - `add_overlay_from_file_with_stored_where_condition`
-- [`tests/modules/mod.rs`](/Users/hustcer/iWork/terminus/nushell/tests/modules/mod.rs)
+- [`tests/modules/mod.rs`](nushell/tests/modules/mod.rs)
   - `module_public_import_decl_with_stored_where_condition`
 
 这两个测试分别覆盖：
