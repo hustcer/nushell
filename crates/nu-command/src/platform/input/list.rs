@@ -1,3 +1,4 @@
+use console::{Key as ConsoleKey, Term as ConsoleTerm};
 use crossterm::{
     cursor::{Hide, MoveDown, MoveToColumn, MoveUp, Show},
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
@@ -15,6 +16,7 @@ use nu_engine::{ClosureEval, command_prelude::*, get_columns};
 use nu_protocol::engine::Closure;
 use nu_protocol::{Config, ListStream, TableMode, shell_error::io::IoError};
 use nu_table::common::nu_value_to_string;
+use std::io::IsTerminal;
 use std::{
     collections::HashSet,
     io::{self, Stderr, Write},
@@ -414,7 +416,7 @@ Use --no-footer and --no-separator to hide the footer and separator line."#
         let is_table_mode = !columns.is_empty();
 
         // Build initial SelectItem list
-        let options: Vec<SelectItem> = initial_values
+        let mut options: Vec<SelectItem> = initial_values
             .into_iter()
             .map(|val| {
                 InputList::make_select_item(
@@ -428,6 +430,45 @@ Use --no-footer and --no-separator to hide the footer and separator line."#
                 )
             })
             .collect();
+
+        if Self::should_use_console_single_select(multi, fuzzy) {
+            while let Some(val) = input_stream.next_value() {
+                options.push(InputList::make_select_item(
+                    val,
+                    &columns,
+                    &display_mode,
+                    &config,
+                    engine_state,
+                    stack,
+                    head,
+                ));
+            }
+
+            if options.is_empty() {
+                return Err(ShellError::TypeMismatch {
+                    err_message: "expected a list or table, it can also be a problem with the inner type of your list.".to_string(),
+                    span: head,
+                });
+            }
+
+            let selection =
+                Self::run_console_single_select(prompt.as_deref(), &options).map_err(|err| {
+                    IoError::new_with_additional_context(err, call.head, None, INTERACT_ERROR)
+                })?;
+
+            return Ok(if index {
+                match selection {
+                    Some(opt) => Value::int(opt as i64, head),
+                    None => Value::nothing(head),
+                }
+            } else {
+                match selection {
+                    Some(opt) => options[opt].value.clone(),
+                    None => Value::nothing(head),
+                }
+            }
+            .into_pipeline_data());
+        }
 
         let table_layout = if is_table_mode {
             Some(Self::calculate_table_layout(&columns, &options))
@@ -610,6 +651,120 @@ Use --no-footer and --no-separator to hide the footer and separator line."#
 }
 
 impl InputList {
+    fn should_use_console_single_select(multi: bool, fuzzy: bool) -> bool {
+        #[cfg(unix)]
+        {
+            !multi && !fuzzy && !io::stdin().is_terminal()
+        }
+
+        #[cfg(not(unix))]
+        {
+            let _ = multi;
+            let _ = fuzzy;
+            false
+        }
+    }
+
+    #[cfg(unix)]
+    fn console_term() -> io::Result<ConsoleTerm> {
+        use std::fs::OpenOptions;
+
+        let input = OpenOptions::new().read(true).write(true).open("/dev/tty")?;
+        let output = input.try_clone()?;
+
+        Ok(ConsoleTerm::read_write_pair(input, output))
+    }
+
+    #[cfg(not(unix))]
+    fn console_term() -> io::Result<ConsoleTerm> {
+        Ok(ConsoleTerm::stderr())
+    }
+
+    fn run_console_single_select(
+        prompt: Option<&str>,
+        items: &[SelectItem],
+    ) -> io::Result<Option<usize>> {
+        let term = Self::console_term()?;
+        let mut rendered_lines = 0;
+        let mut cursor = 0;
+        let mut scroll_offset = 0;
+
+        term.hide_cursor()?;
+        let result = (|| -> io::Result<Option<usize>> {
+            loop {
+                if rendered_lines > 0 {
+                    term.clear_last_lines(rendered_lines)?;
+                    rendered_lines = 0;
+                }
+
+                let prompt_lines = usize::from(prompt.is_some());
+                let (_, height) = term.size();
+                let visible_rows = usize::from(height).saturating_sub(prompt_lines).max(1);
+
+                if cursor < scroll_offset {
+                    scroll_offset = cursor;
+                } else if cursor >= scroll_offset + visible_rows {
+                    scroll_offset = cursor + 1 - visible_rows;
+                }
+
+                if let Some(prompt) = prompt {
+                    term.write_line(prompt)?;
+                    rendered_lines += 1;
+                }
+
+                let end = (scroll_offset + visible_rows).min(items.len());
+                for (index, item) in items[scroll_offset..end].iter().enumerate() {
+                    let item_index = scroll_offset + index;
+                    let cursor_marker = if item_index == cursor { "> " } else { "  " };
+                    let line = item.name.lines().collect::<Vec<_>>().join(" ");
+                    term.write_line(&format!("{cursor_marker}{line}"))?;
+                    rendered_lines += 1;
+                }
+
+                match term.read_key()? {
+                    ConsoleKey::ArrowUp | ConsoleKey::Char('k') => {
+                        cursor = cursor.saturating_sub(1);
+                    }
+                    ConsoleKey::ArrowDown | ConsoleKey::Char('j') => {
+                        cursor = (cursor + 1).min(items.len().saturating_sub(1));
+                    }
+                    ConsoleKey::Home => {
+                        cursor = 0;
+                    }
+                    ConsoleKey::End => {
+                        cursor = items.len().saturating_sub(1);
+                    }
+                    ConsoleKey::PageUp => {
+                        cursor = cursor.saturating_sub(visible_rows);
+                    }
+                    ConsoleKey::PageDown => {
+                        cursor = (cursor + visible_rows).min(items.len().saturating_sub(1));
+                    }
+                    ConsoleKey::Enter => {
+                        return Ok(Some(cursor));
+                    }
+                    ConsoleKey::Escape | ConsoleKey::Char('q') => {
+                        return Ok(None);
+                    }
+                    ConsoleKey::CtrlC => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::Interrupted,
+                            "selection interrupted",
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        })();
+
+        if rendered_lines > 0 {
+            let _ = term.clear_last_lines(rendered_lines);
+        }
+        let _ = term.show_cursor();
+
+        result
+    }
+
     /// Read an initial chunk from the upstream stream.
     ///
     /// Returns `(values, stream_may_have_more)` where the boolean is `false` only when

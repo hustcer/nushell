@@ -97,6 +97,7 @@ chardetng = "0.1.17"
 chrono = { default-features = false, version = "0.4.41" } # polars is requiring <= 0.4.41
 chrono-humanize = "0.2.3"
 chrono-tz = "0.10"
+console = "0.16.2"
 crossbeam-channel = "0.5.15"
 crossterm = "0.29.0"
 csv = "1.4"

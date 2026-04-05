@@ -4243,6 +4243,7 @@ dependencies = [
  "chrono",
  "chrono-humanize",
  "chrono-tz",
+ "console",
  "crossterm",
  "csv",
  "data-encoding",
